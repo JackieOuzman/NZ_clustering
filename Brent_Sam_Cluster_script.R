@@ -39,14 +39,28 @@ library(ggiraphExtra)
 library(knitr)
 library(kableExtra)
 
-qual<-read.csv("insert_filename_here.csv")
+#qual<-read.csv("insert_filename_here.csv")
+qual<-read.csv("V:/Marlborough regional/climate/climate_data_2022_vineyards_R/Climate_data_as_pts/climate_all_cluster_input.csv")
 
+#select just a few clms
+names(qual)
+qual <- qual %>% 
+  dplyr::select(rain_2013:rain_2021)
+
+#remove the missing data - I have only selected one column becasue it should be the same across all the climate grids
+qual <- qual %>% filter(!is.na(rain_2013))
+
+# remove any NAs
 qual<-as_tibble(qual)
 
 glimpse(qual)
 
+
+######################################################################################################################
+#### summary stats  ##############################################################
 summary(qual) %>% kable() %>% kable_styling()
 
+#Histograms 
 qual %>%
   gather(attributes, value, 1:6) %>%
   ggplot(aes(x=value)) +
@@ -54,12 +68,21 @@ qual %>%
   facet_wrap(~attributes, scales = "free_x") +
   labs(x = "Value", y = "Frequency")
 
+# corrlation plot
 corrplot(cor(qual), type = "upper", method = "number", tl.cex = 0.9)
 
+####################################################################################
+####    Scale DATA    ##############################################################
+
 qual_scaled<- scale(qual)
+summary(qual_scaled) %>% kable() %>% kable_styling()
+
+####################################################################################
+####    PCA analysis    ##############################################################
+
 res.pca<-PCA(qual_scaled)
 
-fviz_screeplot(res.pca, addlabels = TRUE, ylim = c(0,50))
+fviz_screeplot(res.pca, addlabels = TRUE, ylim = c(0,50))  # I have used this in PCA analysis to work out how many PCA I should use
 
 var<-get_pca_var(res.pca)
 
@@ -70,12 +93,20 @@ fviz_pca_var(res.pca, col.var = "contrib",
              repel = TRUE #Avoid text overlapping
 ) + theme_minimal() + ggtitle("Variables - PCA")
 
+####################################################################################
+####    K means analysis    ##############################################################
 
-km2<-kmeans(qual_scaled, centers = 2, nstart = 30)
 
+## the below code run kmeans from the scaled data with nstart random sets
+
+km2<-kmeans(qual_scaled, centers = 2, nstart = 30) # ceneters is the number of clusters and nstart random sets
+
+# as a function and the argument is number of clusters
 kmean_calc<- function(df, ...) {
   kmeans(df, scaled = ..., nstart = 30)
 }
+
+#use function to run cluster solution for 2-10 cluster solution
 
 km2<-kmean_calc(qual_scaled, 2)
 km3<-kmean_calc(qual_scaled, 3)
@@ -87,6 +118,9 @@ km8<-kmean_calc(qual_scaled, 8)
 km9<-kmean_calc(qual_scaled, 9)
 km10<-kmean_calc(qual_scaled, 10)
 
+
+#fviz_cluster {factoextra} Provides ggplot2-based visualization of partitioning methods including kmeans
+
 p1<-fviz_cluster(km2, data = qual_scaled, ellipse.type = "convex") + theme_minimal() + ggtitle("k = 2")
 p2<-fviz_cluster(km3, data = qual_scaled, ellipse.type = "convex") + theme_minimal() + ggtitle("k = 3")
 p3<-fviz_cluster(km4, data = qual_scaled, ellipse.type = "convex") + theme_minimal() + ggtitle("k = 4")
@@ -94,6 +128,7 @@ p4<-fviz_cluster(km5, data = qual_scaled, ellipse.type = "convex") + theme_minim
 p5<-fviz_cluster(km6, data = qual_scaled, ellipse.type = "convex") + theme_minimal() + ggtitle("k = 6")
 p6<-fviz_cluster(km7, data = qual_scaled, ellipse.type = "convex") + theme_minimal() + ggtitle("k = 7")
 
+#just plot the cluster results
 plot_grid(p1, p2, p3, p4, p5, p6, labels = c("k2", "k3", "k4", "k5", "k6", "k7"))
 
 set.seed(31)
